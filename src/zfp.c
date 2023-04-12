@@ -6,7 +6,26 @@
 #include "zfp/internal/zfp/macros.h"
 #include "zfp/version.h"
 #include "template/template.h"
+#include <sys/time.h>
 
+struct timeval Start; /*only used for recording the cost*/
+double huffCost = 0;
+
+
+void huff_cost_start()
+{
+	huffCost = 0;
+	gettimeofday(&Start, NULL);
+}
+
+void huff_cost_end()
+{
+	double elapsed;
+	struct timeval costEnd;
+	gettimeofday(&costEnd, NULL);
+	elapsed = ((costEnd.tv_sec*1000000+costEnd.tv_usec)-(Start.tv_sec*1000000+Start.tv_usec))/1000000.0;
+	huffCost += elapsed;
+}
 /* public data ------------------------------------------------------------- */
 
 const uint zfp_codec_version = ZFP_CODEC;
@@ -1051,6 +1070,9 @@ zfp_demote_int32_to_uint16(uint16* oblock, const int32* iblock, uint dims)
 size_t
 zfp_compress(zfp_stream* zfp, const zfp_field* field)
 {
+
+  huff_cost_start();
+
   /* function table [execution][strided][dimensionality][scalar type] */
   void (*ftable[3][2][4][4])(zfp_stream*, const zfp_field*) = {
     /* serial */
@@ -1116,12 +1138,16 @@ zfp_compress(zfp_stream* zfp, const zfp_field* field)
   compress(zfp, field);
   stream_flush(zfp->stream);
 
+  huff_cost_end();
+  printf("compress time: %f s\n", huffCost);
+		
   return stream_size(zfp->stream);
 }
 
 size_t
 zfp_decompress(zfp_stream* zfp, zfp_field* field)
 {
+  huff_cost_start();
   /* function table [execution][strided][dimensionality][scalar type] */
   void (*ftable[3][2][4][4])(zfp_stream*, zfp_field*) = {
     /* serial */
@@ -1176,6 +1202,8 @@ zfp_decompress(zfp_stream* zfp, zfp_field* field)
   decompress(zfp, field);
   stream_align(zfp->stream);
 
+  huff_cost_end();
+	printf("decompress time: %f s\n", huffCost);
   return stream_size(zfp->stream);
 }
 
